@@ -20,48 +20,59 @@ type ConvexVolume struct {
 
 type BuildSettings struct {
 	// Cell size in world units
-	cellSize float32
+	CellSize float32
+
 	// Cell height in world units
-	cellHeight float32
+	CellHeight float32
+
 	// Agent height in world units
-	agentHeight float32
+	AgentHeight float32
+
 	// Agent radius in world units
-	agentRadius float32
+	AgentRadius float32
+
 	// Agent max climb in world units
-	agentMaxClimb float32
+	AgentMaxClimb float32
+
 	// Agent max slope in degrees
-	agentMaxSlope float32
+	AgentMaxSlope float32
+
 	// Region minimum size in voxels.
 	// regionMinSize = sqrt(regionMinArea)
-	regionMinSize float32
+	RegionMinSize float32
+
 	// Region merge size in voxels.
 	// regionMergeSize = sqrt(regionMergeArea)
-	regionMergeSize float32
+	RegionMergeSize float32
+
 	// Edge max length in world units
-	edgeMaxLen float32
+	EdgeMaxLen float32
+
 	// Edge max error in voxels
-	edgeMaxError float32
-	vertsPerPoly float32
+	EdgeMaxError float32
+
+	// VertsPerPolys is the number of vertices to consider per polygons
+	VertsPerPoly float32
+
 	// Detail sample distance in voxels
-	detailSampleDist float32
-	// Detail sample max error in voxel heights.
-	detailSampleMaxError float32
+	DetailSampleDist float32
+
+	// Detail sample max error in voxel heights
+	DetailSampleMaxError float32
+
 	// Partition type, see SamplePartitionType
-	partitionType int32
-	// Bounds of the area to mesh
-	navMeshBMin [3]float32
-	navMeshBMax [3]float32
+	PartitionType int32
+
 	// Size of the tiles in voxels
-	tileSize float32
+	TileSize float32
 }
 
+// InputGeom gathers the geometry used as input for navigation mesh building.
 type InputGeom struct {
-	chunkyMesh *chunkyTriMesh
+	chunkyMesh *ChunkyTriMesh
 	mesh       *MeshLoaderOBJ
 
 	meshBMin, meshBMax [3]float32
-	buildSettings      BuildSettings
-	hasBuildSettings   bool
 
 	// Off-Mesh connections.
 	offMeshConVerts [maxOffMeshConnections * 3 * 2]float32
@@ -77,6 +88,7 @@ type InputGeom struct {
 	volumeCount int32
 }
 
+// LoadOBJMesh loads the geometry from a reader on a OBJ file.
 func (ig *InputGeom) LoadOBJMesh(r io.Reader) error {
 	var err error
 	if ig.mesh != nil {
@@ -93,7 +105,7 @@ func (ig *InputGeom) LoadOBJMesh(r io.Reader) error {
 
 	CalcBounds(ig.mesh.Verts(), ig.mesh.VertCount(), ig.meshBMin[:], ig.meshBMax[:])
 
-	ig.chunkyMesh = new(chunkyTriMesh)
+	ig.chunkyMesh = new(ChunkyTriMesh)
 	if !createChunkyTriMesh(ig.mesh.Verts(), ig.mesh.Tris(), ig.mesh.TriCount(), 256, ig.ChunkyMesh()) {
 		return fmt.Errorf("failed to build chunky mesh")
 	}
@@ -101,96 +113,118 @@ func (ig *InputGeom) LoadOBJMesh(r io.Reader) error {
 	return nil
 }
 
-// Method to return static mesh data.
+// Mesh returns static mesh data.
 func (ig *InputGeom) Mesh() *MeshLoaderOBJ {
 	return ig.mesh
 }
 
-func (ig *InputGeom) MeshBoundsMin() [3]float32 {
-	return ig.meshBMin
+// MeshBoundsMin return the min point of the mesh bounding box.
+func (ig *InputGeom) MeshBoundsMin() []float32 {
+	return ig.meshBMin[:3]
 }
 
-func (ig *InputGeom) MeshBoundsMax() [3]float32 {
-	return ig.meshBMax
+// MeshBoundsMin return the max point of the mesh bounding box.
+func (ig *InputGeom) MeshBoundsMax() []float32 {
+	return ig.meshBMax[:3]
 }
 
-func (ig *InputGeom) NavMeshBoundsMin() [3]float32 {
-	if ig.hasBuildSettings {
-		return ig.buildSettings.navMeshBMin
-	} else {
-		return ig.meshBMin
-	}
+// NavMeshBoundsMin return the min point of the navmesh bounding box.
+//
+// TODO: currently returns the same point as MeshBoundsMin but it should
+// normally depend on the nav mesh build settings
+func (ig *InputGeom) NavMeshBoundsMin() []float32 {
+	return ig.meshBMin[:3]
 }
 
-func (ig *InputGeom) NavMeshBoundsMax() [3]float32 {
-	if ig.hasBuildSettings {
-		return ig.buildSettings.navMeshBMax
-	} else {
-		return ig.meshBMax
-	}
+// NavMeshBoundsMax return the max point of the navmesh bounding box.
+//
+// TODO: currently returns the same point as MeshBoundsMax but it should
+// normally depend on the nav mesh build settings
+func (ig *InputGeom) NavMeshBoundsMax() []float32 {
+	return ig.meshBMax[:3]
 }
 
-func (ig *InputGeom) ChunkyMesh() *chunkyTriMesh {
+// ChunkyMesh returns the underlying chunky triangle mesh.
+func (ig *InputGeom) ChunkyMesh() *ChunkyTriMesh {
 	return ig.chunkyMesh
 }
 
-func (ig *InputGeom) BuildSettings() *BuildSettings {
-	if ig.hasBuildSettings {
-		return &ig.buildSettings
-	}
-	return nil
-}
-
+// ConvexVolumes returns the whole slice of convex volumes added to the input
+// geometry
+//
+// Note: all convex volumes may not be valid, use ConvexVolumesCount in order
+// to only access the N first valid convex volumes.
 func (ig *InputGeom) ConvexVolumes() []ConvexVolume {
 	return ig.volumes[:]
 }
 
+// ConvexVolumesCount returns the length of the slice of convex volumes added to the input
+// geometry.
 func (ig *InputGeom) ConvexVolumesCount() int32 {
 	return ig.volumeCount
 }
 
+// OffMeshConnectionVerts returns the slice of verts of the off-mesh
+// connections.
 func (ig *InputGeom) OffMeshConnectionVerts() []float32 {
 	return ig.offMeshConVerts[:]
 }
 
+// OffMeshConnectionRads returns the slice of orientation, expressed in
+// radians, of the off-mesh connections.
 func (ig *InputGeom) OffMeshConnectionRads() []float32 {
 	return ig.offMeshConRads[:]
 }
 
+// OffMeshConnectionRads returns the slice of areas of the off-mesh
+// connections.
 func (ig *InputGeom) OffMeshConnectionAreas() []uint8 {
 	return ig.offMeshConAreas[:]
 }
 
+// OffMeshConnectionRads returns the slice of flags of the off-mesh
+// connections.
 func (ig *InputGeom) OffMeshConnectionFlags() []uint16 {
 	return ig.offMeshConFlags[:]
 }
 
+// OffMeshConnectionRads returns the slice of identifiers of the off-mesh
+// connections.
 func (ig *InputGeom) OffMeshConnectionId() []uint32 {
 	return ig.offMeshConID[:]
 }
 
+// OffMeshConnectionRads returns the slice of directions of the off-mesh
+// connections.
 func (ig *InputGeom) OffMeshConnectionDirs() []uint8 {
 	return ig.offMeshConDirs[:]
 }
 
+// OffMeshConnectionRads returns the length of the slice of the off-mesh
+// connections.
 func (ig *InputGeom) OffMeshConnectionCount() int32 {
 	return ig.offMeshConCount
 }
 
-func (ig *InputGeom) addConvexVolume(verts []float32, nverts int, minh, maxh float32, area uint8) {
+// AddConvexVolume adds a new convex volume to the input geometry.
+//
+// The convex volume is defined by the verts slice [x, y, z] * Number of
+// vertices.
+func (ig *InputGeom) AddConvexVolume(verts []float32, minh, maxh float32, area uint8) {
 	if ig.volumeCount >= maxVolumes {
 		return
 	}
 	vol := &ig.volumes[ig.volumeCount]
 	ig.volumeCount++
-	copy(vol.Verts[:], verts[3*nverts:])
+	copy(vol.Verts[:], verts)
 	vol.HMin = minh
 	vol.HMax = maxh
-	vol.NVerts = int32(nverts)
+	vol.NVerts = int32(len(verts))
 	vol.Area = int32(area)
 }
 
-func (ig *InputGeom) deleteConvexVolume(i int) {
+// DeleteConvexVolume deletes the ith convex volume.
+func (ig *InputGeom) DeleteConvexVolume(i int) {
 	ig.volumeCount--
 	// copy last volume over the deleted one
 	ig.volumes[i] = ig.volumes[ig.volumeCount]
