@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"unsafe"
 
-	"github.com/aurelien-rainone/gogeo/f32"
-	"github.com/aurelien-rainone/gogeo/f32/d3"
-	"github.com/aurelien-rainone/math32"
+	"github.com/arl/gogeo/f32"
+	"github.com/arl/gogeo/f32/d3"
+	"github.com/arl/math32"
 )
 
 // A NavMesh is a navigation mesh based on tiles of convex polygons.
@@ -832,10 +833,11 @@ func (m *NavMesh) FindNearestPolyInTile(tile *MeshTile, center, extents, nearest
 	polyCount := m.queryPolygonsInTile(tile, bmin, bmax, polys[:], 128)
 
 	// Find nearest polygon amongst the nearby polygons.
-	var nearest PolyRef
-	nearestDistanceSqr := math32.MaxFloat32
-	var i int32
-	for i = 0; i < polyCount; i++ {
+	var (
+		nearest            PolyRef
+		nearestDistanceSqr float32 = math.MaxFloat32
+	)
+	for i := int32(0); i < polyCount; i++ {
 		ref := polys[i]
 		var (
 			posOverPoly bool

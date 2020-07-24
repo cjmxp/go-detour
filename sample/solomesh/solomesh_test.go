@@ -3,13 +3,14 @@ package solomesh
 import (
 	"bytes"
 	"io/ioutil"
+	"math"
 	"os"
 	"testing"
 
-	"github.com/aurelien-rainone/go-detour/detour"
-	"github.com/aurelien-rainone/go-detour/recast"
-	"github.com/aurelien-rainone/gogeo/f32/d3"
-	"github.com/aurelien-rainone/math32"
+	"github.com/arl/go-detour/detour"
+	"github.com/arl/go-detour/recast"
+	"github.com/arl/gogeo/f32/d3"
+	"github.com/arl/math32"
 )
 
 func check(t *testing.T, err error) {
@@ -268,9 +269,9 @@ func TestRaycastSoloMesh(t *testing.T) {
 		{40.389084, 7.797607, 17.144299, 45.056454, 7.418980, 12.680744, 0xffef, 0x0,
 			want{0.435627, 42.422318, 7.632667, 15.199852}},
 		{40.389084, 7.797607, 17.144299, 45.965542, 7.797607, 14.355331, 0xffef, 0x0,
-			want{math32.MaxFloat32, 45.965542, 7.797607, 14.355331}},
+			want{math.MaxFloat32, 45.965542, 7.797607, 14.355331}},
 		{0.631622, 12.705303, 2.767708, 3.878273, 11.266037, -0.112907, 0xffef, 0x0,
-			want{math32.MaxFloat32, 3.878273, 11.266037, -0.112907}},
+			want{math.MaxFloat32, 3.878273, 11.266037, -0.112907}},
 	}
 
 	var (
@@ -317,7 +318,9 @@ func TestRaycastSoloMesh(t *testing.T) {
 		var startRef detour.PolyRef
 		_, startRef, _ = query.FindNearestPoly(spos, polyPickExt, filter)
 
-		hit, st := query.Raycast(startRef, spos, epos, filter, 0, 0)
+		var hit detour.RaycastHit
+
+		st := query.Raycast(startRef, spos, epos, filter, 0, &hit, 0)
 		if detour.StatusFailed(st) {
 			t.Fatalf("Raycast (s:%f %f %f|e:%f %f %f |flags:%x %x) failed with status %s",
 				tt.xstart, tt.ystart, tt.zstart, tt.xend, tt.yend, tt.zend, tt.incFlags, tt.excFlags, st)
